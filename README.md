@@ -19,7 +19,6 @@ last-mile-backend/
 ├── docs/                  # 文档
 ├── scripts/               # 脚本文件
 ├── requirements.txt       # 依赖包
-├── .env.example          # 环境变量示例
 ├── .gitignore            # Git忽略文件
 └── docker-compose.yml    # Docker配置
 ```
