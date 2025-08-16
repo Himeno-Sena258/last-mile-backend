@@ -15,6 +15,7 @@ last-mile-backend/
 │   ├── services/          # 业务逻辑服务
 │   ├── utils/             # 工具函数
 │   └── db/                # 数据库相关
+│   └── schemas/           # 数据验证模型
 ├── tests/                 # 测试文件
 ├── docs/                  # 文档
 ├── scripts/               # 脚本文件
