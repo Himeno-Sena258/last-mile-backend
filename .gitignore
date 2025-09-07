@@ -302,7 +302,7 @@ htmlcov/
 *.joblib
 *.h5
 *.pb
-models/
+/models/
 checkpoints/
 
 # 数据文件
