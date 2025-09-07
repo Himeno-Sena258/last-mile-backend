@@ -45,6 +45,9 @@ def get_password_hash(password: str) -> str:
 def get_user(db: Session, username: str) -> Optional[User]:
     return db.query(User).filter(User.username == username).first()
 
+def get_email(db: Session, email: str) -> Optional[User]:
+    return db.query(User).filter(User.email == email).first()
+
 def authenticate_user(db: Session, username: str, password: str) -> bool | User:
     user = get_user(db, username)
     if not user:
