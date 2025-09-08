@@ -16,5 +16,5 @@ class Task(BaseModel):
     route_id = Column(Integer, ForeignKey('routes.id'), nullable=True, comment='路线ID')
     assigned_car = relationship('Car', foreign_keys=[assigned_car_number], back_populates='assigned_tasks')
     route = relationship('Route', back_populates='tasks')
-    express_items = relationship('Express', back_populates='task')
+    express_item = relationship('Express', back_populates='task', uselist = False)
 
