@@ -11,7 +11,7 @@ class Appointment(BaseModel):
     appointment_time = Column(DateTime, nullable=False, comment='预约时间')
     status = Column(Enum(AppointmentStatus), default=AppointmentStatus.scheduled, comment='预约状态')
     notes = Column(String(500), nullable=True, comment='预约备注')
-
+    
     customer = relationship('User', back_populates='appointments')
     express = relationship('Express', back_populates='appointment')
     route_steps = relationship('RouteStep', back_populates='appointment')
