@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Boolean, Float, ForeignKey, Integer, Enum
+from sqlalchemy import Column, Boolean, Float, ForeignKey, Integer, Enum, String
 
 from sqlalchemy.orm import relationship
 from app.models.enums import CarTaskStatus
@@ -7,6 +7,7 @@ from app.models.base import BaseModel
 class Car(BaseModel):
     __tablename__ = 'cars'
 
+    car_number = Column(String(50), unique=True, nullable=False, comment='小车编号')
     task_status = Column(Enum(CarTaskStatus), default=CarTaskStatus.idle, comment='任务状态')
     current_task_id = Column(Integer, ForeignKey('tasks.id'), nullable=True, comment='当前任务ID')
     current_speed = Column(Float, default=0.0, comment='当前速度(km/h)')

@@ -5,6 +5,7 @@ from app.models.enums import CarTaskStatus
 
 class CarBase(BaseModel):
     """小车基础schema"""
+    car_number: str = Field(..., max_length=50, description="小车编号")
     task_status: CarTaskStatus = Field(default=CarTaskStatus.idle, description="任务状态")
     current_task_id: Optional[int] = Field(None, description="当前任务ID")
     current_speed: float = Field(default=0.0, ge=0, description="当前速度(km/h)")
@@ -16,6 +17,7 @@ class CarBase(BaseModel):
 
 class CarCreate(BaseModel):
     """创建小车schema"""
+    car_number: str = Field(..., max_length=50, description="小车编号")
     task_status: CarTaskStatus = Field(default=CarTaskStatus.idle, description="任务状态")
     current_speed: float = Field(default=0.0, ge=0, description="当前速度(km/h)")
     current_latitude: Optional[float] = Field(None, ge=-90, le=90, description="当前纬度")
@@ -26,6 +28,7 @@ class CarCreate(BaseModel):
 
 class CarUpdate(BaseModel):
     """更新小车schema"""
+    car_number: Optional[str] = Field(None, max_length=50, description="小车编号")
     task_status: Optional[CarTaskStatus] = Field(None, description="任务状态")
     current_task_id: Optional[int] = Field(None, description="当前任务ID")
     current_speed: Optional[float] = Field(None, ge=0, description="当前速度(km/h)")

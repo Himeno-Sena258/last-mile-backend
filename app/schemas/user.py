@@ -24,7 +24,7 @@ class UserUpdate(BaseModel):
     phone: Optional[str] = Field(None, max_length=20, description="电话")
     address: Optional[str] = Field(None, max_length=500, description="地址")
     role: Optional[UserRole] = Field(None, description="用户角色")
-    is_active: Optional[bool] = Field(None, default = True, description="是否激活")
+    is_active: Optional[bool] = Field(default=True, description="是否激活")
 
 class UserResponse(UserBase):
     """用户响应schema"""
