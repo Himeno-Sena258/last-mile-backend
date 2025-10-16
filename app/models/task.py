@@ -10,11 +10,13 @@ class Task(BaseModel):
 
     status = Column(Enum(TaskStatus), default=TaskStatus.pending, comment='任务状态')
     assigned_car_number = Column(String(50), ForeignKey('cars.car_number'), nullable=True, comment='分配的小车编号')
-
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, comment='用户ID')
+    target_address = Column(String(255), nullable=False, comment='目标地址')
     expected_completion_time = Column(DateTime(timezone=True), nullable=True, comment='任务预计完成时间')
     completed_at = Column(DateTime(timezone=True), nullable=True, comment='任务完成时间')
     route_id = Column(Integer, ForeignKey('routes.id'), nullable=True, comment='路线ID')
     assigned_car = relationship('Car', foreign_keys=[assigned_car_number], back_populates='assigned_tasks')
+    user = relationship('User', back_populates='tasks')
     route = relationship('Route', back_populates='tasks')
     express_item = relationship('Express', back_populates='task', uselist = False)
 
