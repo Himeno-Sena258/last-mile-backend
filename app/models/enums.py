@@ -33,3 +33,9 @@ class AppointmentStatus(str, Enum):
     scheduled = 'scheduled'   
     delivered = 'delivered'   
     cancelled = 'cancelled'    
+
+class GeocodingStatus(str, Enum):
+    """地理编码状态枚举"""
+    pending = 'pending'
+    success = 'success'
+    failed = 'failed'
