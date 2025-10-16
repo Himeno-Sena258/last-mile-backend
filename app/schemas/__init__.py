@@ -47,6 +47,13 @@ from .task import (
     TaskResponse,
     TaskStatusUpdate,
 )
+from .geocoding import (
+    CoordSystem,
+    LatLng,
+    GeocodeOptions,
+    GeocodeRequest,
+    GeocodeResponse,
+)
 from .user import (
     UserBase,
     UserCreate,
@@ -115,6 +122,12 @@ __all__ = [
     "TaskUpdate",
     "TaskResponse",
     "TaskStatusUpdate",
+    # Geocoding schemas
+    "CoordSystem",
+    "LatLng",
+    "GeocodeOptions",
+    "GeocodeRequest",
+    "GeocodeResponse",
     # User schemas
     "UserBase",
     "UserCreate",

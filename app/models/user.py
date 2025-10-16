@@ -17,3 +17,5 @@ class User(BaseModel):
 
     appointments = relationship('Appointment', back_populates='customer')
     express_items = relationship('Express', back_populates='recipient_user', foreign_keys='Express.recipient_user_id')
+    addresses = relationship('UserAddress', back_populates='user')
+    tasks = relationship('Task', back_populates='user', foreign_keys='Task.user_id')
