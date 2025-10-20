@@ -14,6 +14,7 @@ class User(BaseModel):
     address = Column(JSON, nullable=True, comment='地址')
     role = Column(Enum(UserRole), default=UserRole.customer, comment='用户类别')
     is_active = Column(Boolean, default=True, comment='是否激活')
+    avatar_url = Column(String(512), nullable=True, comment='头像URL')
 
     appointments = relationship('Appointment', back_populates='customer')
     express_items = relationship('Express', back_populates='recipient_user', foreign_keys='Express.recipient_user_id')
