@@ -12,6 +12,7 @@ class UserBase(BaseModel):
     address: Optional[List[str]] = Field(None, description="地址")
     role: UserRole = Field(default=UserRole.customer, description="用户角色")
     is_active: bool = Field(default=True, description="是否激活")
+    avatar_url: Optional[str] = Field(None, alias="avatarUrl", max_length=512, description="用户头像URL")
 
 class UserCreate(UserBase):
     """创建用户schema"""
@@ -25,6 +26,7 @@ class UserUpdate(BaseModel):
     address: Optional[str] = Field(None, max_length=500, description="地址")
     role: Optional[UserRole] = Field(None, description="用户角色")
     is_active: Optional[bool] = Field(default=True, description="是否激活")
+    avatar_url: Optional[str] = Field(None, alias="avatarUrl", max_length=512, description="用户头像URL")
 
 class UserResponse(UserBase):
     """用户响应schema"""
