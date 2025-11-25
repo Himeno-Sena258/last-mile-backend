@@ -18,5 +18,8 @@ class User(BaseModel):
 
     appointments = relationship('Appointment', back_populates='customer')
     express_items = relationship('Express', back_populates='recipient_user', foreign_keys='Express.recipient_user_id')
-    addresses = relationship('UserAddress', back_populates='user')
+    # 多对多地址关系：通过关联表 user_addresses 连接到 Address
+    addresses = relationship('Address', secondary='user_addresses', back_populates='users')
+    # 关联对象关系：可用于精细控制关联记录（可选）
+    user_addresses = relationship('UserAddress', back_populates='user', cascade='all, delete-orphan')
     tasks = relationship('Task', back_populates='user', foreign_keys='Task.user_id')

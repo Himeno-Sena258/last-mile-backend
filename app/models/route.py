@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, DateTime, Float, ForeignKey, Text
+from sqlalchemy import Column, String, Integer, DateTime, Float, ForeignKey, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
 
@@ -15,12 +15,17 @@ class Route(BaseModel):
 class RouteStep(BaseModel):
     __tablename__ = 'route_steps'
 
-    route_id = Column(Integer, ForeignKey('routes.id'), primary_key=True, comment='路线ID')
-    step_order = Column(Integer, primary_key=True, comment='步骤顺序')
+    # 使用 BaseModel 的自增主键 `id` 作为唯一主键，确保与全局基类一致
+    route_id = Column(Integer, ForeignKey('routes.id'), nullable=False, comment='路线ID')
+    step_order = Column(Integer, nullable=False, comment='步骤顺序')
+    __table_args__ = (
+        UniqueConstraint('route_id', 'step_order', name='uq_route_step_order'),
+    )
     pickup_latitude = Column(Float, nullable=True, comment='预约取件位置纬度')
     pickup_longitude = Column(Float, nullable=True, comment='预约取件位置经度')
     appointment_id = Column(Integer, ForeignKey('appointments.id'), nullable=True, comment='预约信息ID')
-    express_tracking_number = Column(String(100), ForeignKey('express.tracking_number'), nullable=True, comment='对应快递单号')
+    # 改为使用主键外键：express_id
+    express_id = Column(Integer, ForeignKey('express.id'), nullable=True, comment='对应快递ID')
     location_description = Column(String(500), nullable=True, comment='位置描述（如街道号等）')
     estimated_arrival_time = Column(DateTime(timezone=True), nullable=True, comment='预计到达时间')
     route = relationship('Route', back_populates='route_steps')

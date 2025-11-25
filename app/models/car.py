@@ -18,5 +18,5 @@ class Car(BaseModel):
     is_active = Column(Boolean, default=True, comment='是否激活')
 
     current_task = relationship('Task', foreign_keys=[current_task_id])
-    assigned_tasks = relationship('Task', foreign_keys='Task.assigned_car_number', back_populates='assigned_car')
+    assigned_tasks = relationship('Task', foreign_keys='Task.car_id', back_populates='assigned_car')
     car_logs = relationship('CarLog', back_populates='car')
