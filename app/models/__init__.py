@@ -4,7 +4,6 @@ from .user import User
 from .user_address import UserAddress, Address
 from .station import Station
 from .car_task_assignment import CarTaskAssignment
-from .session import UserSession
 from .car import Car
 from .task import Task
 from .express import Express
@@ -21,8 +20,7 @@ __all__ = [
     'Address',
     'Station',
     'CarTaskAssignment',
-    'UserSession',
-    'Car', 
+    'Car',
     'Task',
     'Express',
     'Route',
@@ -30,7 +28,7 @@ __all__ = [
     'Appointment',
     'CarLog',
     'UserRole',
-    'TaskStatus', 
+    'TaskStatus',
     'ExpressStatus',
     'CarTaskStatus',
     'AppointmentStatus',

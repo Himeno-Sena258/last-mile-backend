@@ -61,23 +61,6 @@ from .user import (
     UserLogin,
     UserResponse,
 )
-from .session import (
-    SessionBase,
-    SessionInitializeRequest,
-    SessionResponse,
-    SessionTerminateRequest,
-    SessionTerminationResponse,
-    ForceTerminateRequest,
-    HeartbeatRequest,
-    HeartbeatResponse,
-    SessionValidationResponse,
-    ActivityUpdateRequest,
-    ActivityUpdateResponse,
-    SessionConfigResponse,
-    SessionCreate,
-    SessionUpdate,
-    SessionFullResponse,
-)
 
 __all__ = [
     # Appointment schemas
@@ -134,20 +117,4 @@ __all__ = [
     "UserUpdate",
     "UserLogin",
     "UserResponse",
-    # Session schemas
-    "SessionBase",
-    "SessionInitializeRequest",
-    "SessionResponse",
-    "SessionTerminateRequest",
-    "SessionTerminationResponse",
-    "ForceTerminateRequest",
-    "HeartbeatRequest",
-    "HeartbeatResponse",
-    "SessionValidationResponse",
-    "ActivityUpdateRequest",
-    "ActivityUpdateResponse",
-    "SessionConfigResponse",
-    "SessionCreate",
-    "SessionUpdate",
-    "SessionFullResponse",
 ]
