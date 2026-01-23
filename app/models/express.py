@@ -3,8 +3,9 @@ from sqlalchemy.orm import relationship
 from app.models.enums import ExpressStatus
 from app.models.base import BaseModel
 
+
 class Express(BaseModel):
-    __tablename__ = 'express'    
+    __tablename__ = 'express'
 
     recipient_name = Column(String(100), nullable=False, comment='收件人姓名')
     recipient_phone = Column(String(20), nullable=False, comment='收件人电话')
@@ -14,8 +15,6 @@ class Express(BaseModel):
     pickup_code = Column(String(20), nullable=True, comment='取件码')
     recipient_user_id = Column(Integer, ForeignKey('users.id'), nullable=False, comment='收件人用户ID')
     status = Column(Enum(ExpressStatus), default=ExpressStatus.unassigned, comment='快递状态')
-    # 规范化：新增驿站主键外键
-    station_id = Column(Integer, ForeignKey('stations.id'), nullable=True, comment='所属驿站ID')
     task_id = Column(Integer, ForeignKey('tasks.id'), nullable=True, comment='对应配送任务ID')
 
     # 与任务的一对一关系：统一 back_populates 名称为 'express'
@@ -24,4 +23,3 @@ class Express(BaseModel):
     route_steps = relationship('RouteStep', back_populates='express')
     recipient_user = relationship('User', back_populates='express_items', foreign_keys=[recipient_user_id])
     recipient_address = relationship('Address')
-    station = relationship('Station', back_populates='express_items')

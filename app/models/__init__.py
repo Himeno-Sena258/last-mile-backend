@@ -2,7 +2,6 @@ from .base import BaseModel
 from app.db.database import Base
 from .user import User
 from .user_address import UserAddress, Address
-from .station import Station
 from .car_task_assignment import CarTaskAssignment
 from .car import Car
 from .task import Task
@@ -18,7 +17,6 @@ __all__ = [
     'User',
     'UserAddress',
     'Address',
-    'Station',
     'CarTaskAssignment',
     'Car',
     'Task',
