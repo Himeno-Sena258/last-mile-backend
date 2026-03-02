@@ -15,4 +15,3 @@ class Appointment(BaseModel):
     
     customer = relationship('User', back_populates='appointments')
     express = relationship('Express', back_populates='appointment')
-    route_steps = relationship('RouteStep', back_populates='appointment')

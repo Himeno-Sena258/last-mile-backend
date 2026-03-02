@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.routes import app as user_router
+from app.api.user_routes import app as user_router
 from app.api.appointment_routes import router as appointment_router
 from app.api.task_routes import router as task_router
 from app.api.express_routes import router as express_router

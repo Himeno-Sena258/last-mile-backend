@@ -20,6 +20,5 @@ class Express(BaseModel):
     # 与任务的一对一关系：统一 back_populates 名称为 'express'
     task = relationship('Task', back_populates='express')
     appointment = relationship('Appointment', back_populates='express', uselist=False)
-    route_steps = relationship('RouteStep', back_populates='express')
     recipient_user = relationship('User', back_populates='express_items', foreign_keys=[recipient_user_id])
     recipient_address = relationship('Address')

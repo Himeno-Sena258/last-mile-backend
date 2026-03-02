@@ -29,17 +29,6 @@ from .car_log import (
     CarLogQuery,
     CarLogSummary,
 )
-from .route import (
-    RouteBase,
-    RouteCreate,
-    RouteUpdate,
-    RouteResponse,
-    RouteStepBase,
-    RouteStepCreate,
-    RouteStepUpdate,
-    RouteStepResponse,
-    RouteWithStepsResponse,
-)
 from .task import (
     TaskBase,
     TaskCreate,
@@ -89,16 +78,6 @@ __all__ = [
     "CarLogResponse",
     "CarLogQuery",
     "CarLogSummary",
-    # Route schemas
-    "RouteBase",
-    "RouteCreate",
-    "RouteUpdate",
-    "RouteResponse",
-    "RouteStepBase",
-    "RouteStepCreate",
-    "RouteStepUpdate",
-    "RouteStepResponse",
-    "RouteWithStepsResponse",
     # Task schemas
     "TaskBase",
     "TaskCreate",

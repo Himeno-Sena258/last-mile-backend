@@ -40,7 +40,6 @@ async def create_task(payload: TaskCreate, db: Session = Depends(get_db), curren
         geocoding_status=payload.geocoding_status,
         geocoded_at=payload.geocoded_at,
         expected_completion_time=payload.expected_completion_time,
-        route_id=payload.route_id,
     )
     db.add(new_item)
     db.commit()
@@ -81,8 +80,6 @@ async def update_task(task_id: int, payload: TaskUpdate, db: Session = Depends(g
         item.expected_completion_time = payload.expected_completion_time
     if payload.completed_at is not None:
         item.completed_at = payload.completed_at
-    if payload.route_id is not None:
-        item.route_id = payload.route_id
     if payload.target_address is not None:
         item.target_address = payload.target_address
     if payload.target_latitude is not None:
