@@ -16,7 +16,7 @@ class Task(BaseModel):
     target_address_id = Column(Integer, ForeignKey('addresses.id'), nullable=True, comment='目标地址ID')
     target_address = Column(Text, nullable=True, comment='目标地址文本快照')
     target_latitude = Column(Numeric(9, 6), nullable=True, comment='目标地址纬度')
-    target_longitude = Column(Numeric(9, 6), nullable=True, comment='目标地址经度')
+    target_longitude = Column   (Numeric(9, 6), nullable=True, comment='目标地址经度')
     coord_system = Column(String(10), nullable=False, default='WGS84', comment='坐标系统')
     geocoder_place_id = Column(String(64), nullable=True, comment='地理编码的place_id')
     geocoder_accuracy_m = Column(Float, nullable=True, comment='地理编码精度（米）')

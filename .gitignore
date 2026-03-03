@@ -25,7 +25,7 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
-
+scripts/
 # PyInstaller
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
@@ -255,6 +255,7 @@ secrets.json
 .pytest_cache/
 
 # Alembic
+
 alembic/versions/*.py
 !alembic/versions/__init__.py
 
