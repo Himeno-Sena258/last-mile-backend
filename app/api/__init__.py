@@ -4,6 +4,7 @@ from app.api.appointment_routes import router as appointment_router
 from app.api.task_routes import router as task_router
 from app.api.express_routes import router as express_router
 from app.api.car_routes import router as car_router
+from app.api.geocoding_routes import router as geocoding_router
 
 router = APIRouter()
 
@@ -21,3 +22,6 @@ router.include_router(express_router)
 
 # 注册小车相关路由
 router.include_router(car_router)
+
+# 注册地理编码相关路由
+router.include_router(geocoding_router)
