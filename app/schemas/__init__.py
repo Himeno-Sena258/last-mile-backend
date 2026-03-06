@@ -29,17 +29,6 @@ from .car_log import (
     CarLogQuery,
     CarLogSummary,
 )
-from .route import (
-    RouteBase,
-    RouteCreate,
-    RouteUpdate,
-    RouteResponse,
-    RouteStepBase,
-    RouteStepCreate,
-    RouteStepUpdate,
-    RouteStepResponse,
-    RouteWithStepsResponse,
-)
 from .task import (
     TaskBase,
     TaskCreate,
@@ -60,23 +49,6 @@ from .user import (
     UserUpdate,
     UserLogin,
     UserResponse,
-)
-from .session import (
-    SessionBase,
-    SessionInitializeRequest,
-    SessionResponse,
-    SessionTerminateRequest,
-    SessionTerminationResponse,
-    ForceTerminateRequest,
-    HeartbeatRequest,
-    HeartbeatResponse,
-    SessionValidationResponse,
-    ActivityUpdateRequest,
-    ActivityUpdateResponse,
-    SessionConfigResponse,
-    SessionCreate,
-    SessionUpdate,
-    SessionFullResponse,
 )
 
 __all__ = [
@@ -106,16 +78,6 @@ __all__ = [
     "CarLogResponse",
     "CarLogQuery",
     "CarLogSummary",
-    # Route schemas
-    "RouteBase",
-    "RouteCreate",
-    "RouteUpdate",
-    "RouteResponse",
-    "RouteStepBase",
-    "RouteStepCreate",
-    "RouteStepUpdate",
-    "RouteStepResponse",
-    "RouteWithStepsResponse",
     # Task schemas
     "TaskBase",
     "TaskCreate",
@@ -134,20 +96,4 @@ __all__ = [
     "UserUpdate",
     "UserLogin",
     "UserResponse",
-    # Session schemas
-    "SessionBase",
-    "SessionInitializeRequest",
-    "SessionResponse",
-    "SessionTerminateRequest",
-    "SessionTerminationResponse",
-    "ForceTerminateRequest",
-    "HeartbeatRequest",
-    "HeartbeatResponse",
-    "SessionValidationResponse",
-    "ActivityUpdateRequest",
-    "ActivityUpdateResponse",
-    "SessionConfigResponse",
-    "SessionCreate",
-    "SessionUpdate",
-    "SessionFullResponse",
 ]

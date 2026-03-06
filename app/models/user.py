@@ -10,7 +10,7 @@ class User(BaseModel):
     email = Column(String(100), unique=True, index=True, nullable=True, comment='邮箱')
     hashed_password = Column(String(255), nullable=False, comment='加密密码')
     name = Column(String(100), nullable=False, comment='姓名')
-    phone = Column(String(20), nullable=False, comment='电话')
+    phone = Column(String(20), nullable=True, comment='电话')
     address = Column(JSON, nullable=True, comment='地址')
     role = Column(Enum(UserRole), default=UserRole.customer, comment='用户类别')
     is_active = Column(Boolean, default=True, comment='是否激活')

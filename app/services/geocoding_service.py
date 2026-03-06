@@ -15,6 +15,7 @@ from app.schemas.geocoding import (
     CoordSystem,
 )
 from app.models.enums import GeocodingStatus
+from app.services.errors import ServiceError
 
 
 def build_tencent_sn(path: str, params: Dict[str, Any], sk: str) -> str:
@@ -124,3 +125,15 @@ def geocode_tencent(address: str, opts: GeocodeOptions) -> GeocodeResponse:
             message=str(exc),
             geocoded_at=datetime.utcnow(),
         )
+
+
+def geocode_address(address: str, opts: GeocodeOptions) -> GeocodeResponse:
+    """应用层地理编码入口。
+
+    - 保持响应结构由 `geocode_tencent` 统一返回；
+    - 若出现未预期异常，则抛出 `ServiceError` 供 Controller 统一映射为 500。
+    """
+    try:
+        return geocode_tencent(address, opts)
+    except Exception as exc:
+        raise ServiceError(status_code=500, detail=str(exc))

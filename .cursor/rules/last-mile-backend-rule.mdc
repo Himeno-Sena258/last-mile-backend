@@ -1,0 +1,13 @@
+---
+name: last-mile-backend-rule
+description: This is a new rule
+---
+
+# Overview
+
+Insert overview text here. The agent will only see this should they choose to apply the rule.
+
+- 全程使用中文和我对话
+- 这只是一个小的竞赛项目，一切从简设计，只需在验收的时候展示核心功能，不用上线运营
+- 禁止为了解决一个小的问题而引入繁重的第三方库
+- 因为项目只做演示不必实际上线，所以不必做的特别规范

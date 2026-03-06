@@ -12,7 +12,7 @@ class CarTaskAssignment(BaseModel):
     task_id = Column(Integer, ForeignKey('tasks.id'), nullable=False, comment='任务ID')
     assigned_at = Column(DateTime, default=datetime.now, nullable=False, comment='分配时间')
     unassigned_at = Column(DateTime, nullable=True, comment='取消分配时间')
-    status = Column(Enum(CarTaskStatus), default=CarTaskStatus.assigned, nullable=False, comment='分配状态')
+    status = Column(Enum(CarTaskStatus), default=CarTaskStatus.idle, nullable=False, comment='分配状态')
 
     car = relationship('Car')
     task = relationship('Task')
