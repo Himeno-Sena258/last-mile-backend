@@ -29,3 +29,11 @@ class Task(BaseModel):
     # 与快递的一对一关系：统一属性名为 'express'
     express = relationship('Express', back_populates='task', uselist=False)
 
+    @property
+    def assigned_car_number(self):
+        """兼容旧接口字段：返回分配小车编号。"""
+        try:
+            return self.assigned_car.car_number if self.assigned_car else None
+        except Exception:
+            return None
+

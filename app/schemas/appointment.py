@@ -7,14 +7,17 @@ class AppointmentBase(BaseModel):
     """预约基础schema"""
     customer_id: int = Field(..., description="客户ID")
     express_tracking_number: str = Field(..., max_length=100, description="对应快递单号")
+    pickup_address: str = Field(..., max_length=255, description="取件地址")
     appointment_time: datetime = Field(..., description="预约时间")
     status: AppointmentStatus = Field(default=AppointmentStatus.scheduled, description="预约状态")
     notes: Optional[str] = Field(None, max_length=500, description="预约备注")
+    
 
 class AppointmentCreate(BaseModel):
     """创建预约schema"""
     customer_id: int = Field(..., description="客户ID")
     express_tracking_number: str = Field(..., max_length=100, description="对应快递单号")
+    pickup_address: str = Field(..., max_length=255, description="取件地址")
     appointment_time: datetime = Field(..., description="预约时间")
     status: AppointmentStatus = Field(default=AppointmentStatus.scheduled, description="预约状态")
     notes: Optional[str] = Field(None, max_length=500, description="预约备注")
@@ -23,6 +26,7 @@ class AppointmentUpdate(BaseModel):
     """更新预约schema"""
     appointment_time: Optional[datetime] = Field(None, description="预约时间")
     status: Optional[AppointmentStatus] = Field(None, description="预约状态")
+    pickup_address: Optional[str] = Field(None, max_length=255, description="取件地址")
     notes: Optional[str] = Field(None, max_length=500, description="预约备注")
 
 class AppointmentResponse(AppointmentBase):

@@ -21,4 +21,17 @@ class Express(BaseModel):
     task = relationship('Task', back_populates='express')
     appointment = relationship('Appointment', back_populates='express', uselist=False)
     recipient_user = relationship('User', back_populates='express_items', foreign_keys=[recipient_user_id])
-    recipient_address = relationship('Address')
+    recipient_address_obj = relationship('Address')
+
+    @property
+    def recipient_address_text(self):
+        """内部使用：返回地址文本快照。"""
+        try:
+            return self.recipient_address_obj.address_text if self.recipient_address_obj else ""
+        except Exception:
+            return ""
+
+    @property
+    def recipient_address(self):
+        """兼容旧接口字段：返回收件人地址字符串。"""
+        return self.recipient_address_text
