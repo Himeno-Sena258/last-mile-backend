@@ -5,7 +5,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field, condecimal
+from pydantic import BaseModel, ConfigDict, Field, condecimal
 
 from app.models.enums import GeocodingStatus
 
@@ -36,16 +36,15 @@ class GeocodeOptions(BaseModel):
     )
     region: Optional[str] = Field(None, description="区域参数，如 Google 的 region")
 
-    class Config:
-        allow_population_by_field_name = True
+    # Pydantic v2：允许用字段名而不是 alias（例如 api_key 而不是 apiKey）
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class GeocodeRequest(BaseModel):
     address: str = Field(..., min_length=1, max_length=512, description="地址字符串")
     opts: GeocodeOptions = Field(..., alias="opts", description="地理编码选项")
 
-    class Config:
-        allow_population_by_field_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class GeocodeResponse(BaseModel):
@@ -61,5 +60,4 @@ class GeocodeResponse(BaseModel):
     geocoded_at: Optional[datetime] = Field(None, alias="geocodedAt", description="地理编码时间")
     message: Optional[str] = Field(None, description="错误或提示信息")
 
-    class Config:
-        allow_population_by_field_name = True
+    model_config = ConfigDict(populate_by_name=True)

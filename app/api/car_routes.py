@@ -3,9 +3,11 @@ from sqlalchemy.orm import Session
 from typing import List
 
 import time
+import json
 
 from app.api._helpers import raise_http
 from app.db.database import get_db
+from app.db.database import SessionLocal
 from app.core.security import get_current_user
 from app.models.user import User
 from app.services.car_service import CarService
@@ -20,8 +22,15 @@ from app.schemas.car import (
 from fastapi import WebSocket
 from starlette.websockets import WebSocketDisconnect
 
+from app.services.car_ws_manager import (
+    register_car_control_connection,
+    unregister_car_control_connection,
+)
+from app.services.dispatch_service import DispatchService
+
 router = APIRouter()
 _car_service = CarService()
+_dispatch_service = DispatchService()
 
 
 @router.post('/api/cars', response_model=CarResponse, status_code=status.HTTP_201_CREATED)
@@ -115,25 +124,64 @@ async def car_video_stream(websocket: WebSocket, car_id: int):
 async def car_control_channel(websocket: WebSocket, car_id: int):
     # 接入后立即发送占位JSON，供未来扩展为控制指令
     await websocket.accept()
+    await register_car_control_connection(car_id, websocket)
     placeholder = {
         "type": "control_placeholder",
         "car_id": car_id,
         "ts": int(time.time() * 1000),
     }
+    db = SessionLocal()
     try:
         await websocket.send_json(placeholder)
-        # 保持连接以便未来扩展（当前不做额外交互）
         while True:
             message = await websocket.receive()
             text = message.get("text")
+            if not text:
+                continue
+
             if text == "ping":
                 await websocket.send_text("pong")
-            elif text == "close":
+                continue
+
+            if text == "close":
                 await websocket.close()
                 break
-            else:
-                # 其他消息忽略，保持连接
-                pass
+
+            # 约定：车端通过 JSON 回传事件
+            # - {"type":"task_completed","task_id":<id>, ...}
+            data = None
+            try:
+                data = json.loads(text)
+            except Exception:
+                data = None
+
+            if not isinstance(data, dict):
+                await websocket.send_json({"type": "ok"})
+                continue
+
+            msg_type = data.get("type")
+            if msg_type == "task_completed":
+                task_id = data.get("task_id")
+                if not task_id:
+                    await websocket.send_json({"type": "task_completed_ack", "ok": False, "error": "missing task_id"})
+                    continue
+
+                try:
+                    await _dispatch_service.mark_task_completed_from_car(
+                        db,
+                        car_id=car_id,
+                        task_id=int(task_id),
+                        extra_payload=data,
+                    )
+                    await websocket.send_json({"type": "task_completed_ack", "ok": True, "task_id": int(task_id)})
+                except ServiceError as e:
+                    await websocket.send_json(
+                        {"type": "task_completed_ack", "ok": False, "error": e.detail, "status_code": e.status_code}
+                    )
+                continue
+
+            # 其他类型：当前版本仅保留“收到即可”
+            await websocket.send_json({"type": "ok"})
     except WebSocketDisconnect:
         pass
     except Exception:
@@ -141,3 +189,9 @@ async def car_control_channel(websocket: WebSocket, car_id: int):
             await websocket.close(code=1011)
         except Exception:
             pass
+    finally:
+        try:
+            db.close()
+        except Exception:
+            pass
+        await unregister_car_control_connection(car_id)
