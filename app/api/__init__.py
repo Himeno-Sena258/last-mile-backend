@@ -6,6 +6,7 @@ from app.api.express_routes import router as express_router
 from app.api.car_routes import router as car_router
 from app.api.geocoding_routes import router as geocoding_router
 from app.api.regeo_routes import router as regeo_router
+from app.api.dispatch_routes import router as dispatch_router
 
 router = APIRouter()
 
@@ -29,3 +30,6 @@ router.include_router(geocoding_router)
 
 # 注册逆地理 + POI 路由
 router.include_router(regeo_router)
+
+# 注册任务调度路由
+router.include_router(dispatch_router)
