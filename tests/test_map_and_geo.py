@@ -55,17 +55,18 @@ def test_geocode_tencent_missing_address() -> None:
 
 
 def test_geocode_tencent_missing_api_key() -> None:
+    import os
+    os.environ.pop("AMAP_KEY", None)
     opts = GeocodeOptions(api_key=None)
     resp = geocode_tencent("somewhere", opts)
     assert resp.geocoding_status == GeocodingStatus.failed
-    assert resp.message == "Missing TENCENT_MAP_KEY"
+    assert resp.message == "Missing AMAP_KEY"
     assert resp.lat_lng is None
 
 
 def test_geocode_tencent_success_mock_requests(monkeypatch) -> None:
     # 准备环境变量（service 里会读取）
-    monkeypatch.setenv("TENCENT_BASE", "https://fake.example.com")
-    monkeypatch.setenv("TENCENT_GEOCODER_PATH", "/ws/geocoder/v1/")
+    monkeypatch.setenv("AMAP_BASE", "https://fake.example.com")
 
     # mock requests.get
     def fake_get(url: str, params: dict, timeout: int):
@@ -73,8 +74,9 @@ def test_geocode_tencent_success_mock_requests(monkeypatch) -> None:
         assert params["key"] == "test_key"
         return _FakeResp(
             {
-                "status": 0,
-                "result": {"location": {"lat": 31.235, "lng": 121.5}},
+                "status": "1",
+                "count": "1",
+                "geocodes": [{"location": "121.5,31.235"}],
             }
         )
 
@@ -90,16 +92,15 @@ def test_geocode_tencent_success_mock_requests(monkeypatch) -> None:
 
 
 def test_regeo_missing_api_key_raises(monkeypatch) -> None:
-    monkeypatch.delenv("TENCENT_MAP_KEY", raising=False)
+    monkeypatch.delenv("AMAP_KEY", raising=False)
     with pytest.raises(ServiceError) as excinfo:
         regeo(39.0, 116.0)
     assert excinfo.value.status_code == 500
-    assert excinfo.value.detail == "Missing TENCENT_MAP_KEY"
+    assert excinfo.value.detail == "Missing AMAP_KEY"
 
 
 def test_regeo_success_mock_requests(monkeypatch) -> None:
-    monkeypatch.setenv("TENCENT_MAP_KEY", "test_key")
-    monkeypatch.delenv("TENCENT_MAP_SK", raising=False)
+    monkeypatch.setenv("AMAP_KEY", "test_key")
 
     # mock requests.get，返回一组 pois（location 用 GCJ-02）
     def fake_get(url: str, params: dict, timeout: int):
@@ -107,15 +108,15 @@ def test_regeo_success_mock_requests(monkeypatch) -> None:
         assert params["key"] == "test_key"
         return _FakeResp(
             {
-                "status": 0,
-                "result": {
-                    "address": "Mock Address",
+                "status": "1",
+                "regeocode": {
+                    "formatted_address": "Mock Address",
                     "pois": [
                         {
-                            "title": "POI-1",
+                            "name": "POI-1",
                             "address": "POI-1 Address",
                             "id": "1",
-                            "location": {"lat": 31.1, "lng": 121.2},
+                            "location": "121.2,31.1",
                         }
                     ],
                 },

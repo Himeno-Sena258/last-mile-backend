@@ -1,6 +1,6 @@
-from .geocoding_service import build_tencent_sn, geocode_tencent
+from .geocoding_service import geocode_amap, geocode_tencent
 
 __all__ = [
-    "build_tencent_sn",
+    "geocode_amap",
     "geocode_tencent",
 ]
