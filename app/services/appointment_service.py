@@ -58,6 +58,7 @@ class AppointmentService:
         new_item = Appointment(
             customer_id=payload.customer_id,
             express_id=express.id,
+            pickup_address=payload.pickup_address,
             appointment_time=payload.appointment_time,
             status=payload.status,
             notes=payload.notes,
@@ -90,6 +91,8 @@ class AppointmentService:
             item.appointment_time = payload.appointment_time
         if payload.status is not None:
             item.status = payload.status
+        if payload.pickup_address is not None:
+            item.pickup_address = payload.pickup_address
         if payload.notes is not None:
             item.notes = payload.notes
 
