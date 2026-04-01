@@ -54,7 +54,6 @@ class UserService:
             email=payload.email,
             name=payload.name,
             phone=payload.phone,
-            address=payload.address,
             role=payload.role,
             is_active=True,
             hashed_password=hashed_password,
@@ -89,8 +88,6 @@ class UserService:
             current_user.name = payload.name
         if payload.phone is not None:
             current_user.phone = payload.phone
-        if payload.address is not None:
-            current_user.address = payload.address
         if payload.role is not None:
             current_user.role = payload.role
         if payload.is_active is not None:

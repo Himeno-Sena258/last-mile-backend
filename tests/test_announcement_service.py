@@ -17,7 +17,6 @@ def _create_user(db: Session, *, username: str, role: UserRole) -> User:
         hashed_password="hash",
         name=username,
         phone="13800000000",
-        address=None,
         role=role,
         is_active=True,
         avatar_url=None,
