@@ -19,7 +19,6 @@ def _create_customer(db: Session, username: str = "customer1") -> User:
         hashed_password="hash",
         name="Customer",
         phone="13800000000",
-        address=None,
         role=UserRole.customer,
         is_active=True,
         avatar_url=None,

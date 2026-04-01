@@ -8,6 +8,7 @@ from app.api.geocoding_routes import router as geocoding_router
 from app.api.regeo_routes import router as regeo_router
 from app.api.dispatch_routes import router as dispatch_router
 from app.api.announcement_routes import router as announcement_router
+from app.api.address_routes import router as address_router
 
 router = APIRouter()
 
@@ -37,3 +38,6 @@ router.include_router(dispatch_router)
 
 # 注册公告路由
 router.include_router(announcement_router)
+
+# 注册地址路由
+router.include_router(address_router)

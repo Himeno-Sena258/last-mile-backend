@@ -50,6 +50,12 @@ from .user import (
     UserLogin,
     UserResponse,
 )
+from .address import (
+    AddressBase,
+    AddressCreate,
+    AddressUpdate,
+    AddressResponse,
+)
 
 __all__ = [
     # Appointment schemas
@@ -96,4 +102,9 @@ __all__ = [
     "UserUpdate",
     "UserLogin",
     "UserResponse",
+    # Address schemas
+    "AddressBase",
+    "AddressCreate",
+    "AddressUpdate",
+    "AddressResponse",
 ]
