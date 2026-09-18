@@ -15,10 +15,11 @@ async def register_car_control_connection(car_id: int, websocket: WebSocket) -> 
         _control_connections[car_id] = websocket
 
 
-async def unregister_car_control_connection(car_id: int) -> None:
+async def unregister_car_control_connection(car_id: int, websocket: Optional[WebSocket] = None) -> None:
     """注销小车 control WebSocket 连接。"""
     async with _lock:
-        _control_connections.pop(car_id, None)
+        if websocket is None or _control_connections.get(car_id) is websocket:
+            _control_connections.pop(car_id, None)
 
 
 async def get_car_control_connection(car_id: int) -> Optional[WebSocket]:
@@ -37,6 +38,6 @@ async def send_car_control_message(car_id: int, payload: dict) -> bool:
         return True
     except Exception:
         # 连接可能已断开或处于异常状态
-        await unregister_car_control_connection(car_id)
+        await unregister_car_control_connection(car_id, websocket)
         return False
 

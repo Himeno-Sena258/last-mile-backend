@@ -4,6 +4,7 @@ from .user import User
 from .user_address import UserAddress, Address
 from .car_task_assignment import CarTaskAssignment
 from .car import Car
+from .car_location import CarLocation
 from .task import Task
 from .express import Express
 from .appointment import Appointment

@@ -5,10 +5,11 @@ from fastapi.responses import JSONResponse
 from app.api import router as api_router
 from app.db.database import engine
 import app.models as models
+from app.services.dispatch_scheduler import dispatch_lifespan
 
 models.Base.metadata.create_all(bind=engine)
 
-app = FastAPI()
+app = FastAPI(lifespan=dispatch_lifespan)
 
 
 @app.exception_handler(RequestValidationError)

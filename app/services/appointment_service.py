@@ -6,7 +6,8 @@ from typing import List
 from sqlalchemy.orm import Session
 
 from app.models.appointment import Appointment
-from app.models.enums import UserRole
+from app.models.enums import AppointmentStatus, ExpressStatus, GeocodingStatus, TaskStatus, UserRole
+from app.models.task import Task
 from app.models.express import Express
 from app.models.user import User
 from app.schemas.appointment import (
@@ -54,6 +55,16 @@ class AppointmentService:
             raise ServiceError(status_code=403, detail="只能为自己创建预约")
 
         express = self._get_express_by_tracking_or_400(db, payload.express_tracking_number)
+        express = db.query(Express).filter(Express.id == express.id).with_for_update().one()
+        if current_user.role != UserRole.admin and express.recipient_user_id != current_user.id:
+            raise ServiceError(status_code=403, detail="只能预约自己的快递")
+        if express.status != ExpressStatus.unassigned or express.task_id is not None:
+            raise ServiceError(status_code=409, detail="快递已进入配送流程")
+        if db.query(Appointment).filter(
+            Appointment.express_id == express.id,
+            Appointment.status == AppointmentStatus.scheduled,
+        ).first():
+            raise ServiceError(status_code=409, detail="该快递已有有效预约")
 
         new_item = Appointment(
             customer_id=payload.customer_id,
@@ -69,6 +80,28 @@ class AppointmentService:
         self._commit(db)
         db.refresh(new_item)
         return new_item
+
+    def _sync_pending_task(self, db: Session, item: Appointment) -> None:
+        express = db.query(Express).filter(Express.id == item.express_id).with_for_update().one()
+        if express.task_id is None:
+            return
+        task = db.query(Task).filter(Task.id == express.task_id).with_for_update().one()
+        if task.status != TaskStatus.pending:
+            raise ServiceError(status_code=409, detail="配送已开始，无法修改预约")
+        if item.status != AppointmentStatus.scheduled:
+            task.status = TaskStatus.cancelled
+            express.task_id = None
+        else:
+            if task.target_address != item.pickup_address:
+                task.target_latitude = None
+                task.target_longitude = None
+                task.geocoding_status = GeocodingStatus.pending
+                task.geocoded_at = None
+                task.geocoder_place_id = None
+                task.geocoder_accuracy_m = None
+            task.target_address = item.pickup_address
+            task.expected_completion_time = item.appointment_time
+        task.updated_at = datetime.now()
 
     def get_appointment(self, db: Session, current_user: User, appointment_id: int) -> Appointment:
         """获取预约详情。"""
@@ -97,6 +130,7 @@ class AppointmentService:
             item.notes = payload.notes
 
         item.updated_at = datetime.now()
+        self._sync_pending_task(db, item)
         db.add(item)
         self._commit(db)
         db.refresh(item)
@@ -111,6 +145,7 @@ class AppointmentService:
         if payload.notes is not None:
             item.notes = payload.notes
         item.updated_at = datetime.now()
+        self._sync_pending_task(db, item)
         db.add(item)
         self._commit(db)
         db.refresh(item)
@@ -125,7 +160,7 @@ class AppointmentService:
         if payload.notes is not None:
             item.notes = payload.notes
         item.updated_at = datetime.now()
-
+        self._sync_pending_task(db, item)
         db.add(item)
         self._commit(db)
         db.refresh(item)

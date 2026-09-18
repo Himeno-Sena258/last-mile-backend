@@ -4,6 +4,11 @@ from typing import List
 
 import time
 import json
+import os
+import secrets
+from pydantic import ValidationError
+from app.schemas.car_location import LocationReport
+from app.services.car_location_service import CarLocationService
 
 from app.api._helpers import raise_http
 from app.db.database import get_db
@@ -122,6 +127,18 @@ async def car_video_stream(websocket: WebSocket, car_id: int):
 
 @router.websocket('/ws/cars/{car_id}/control')
 async def car_control_channel(websocket: WebSocket, car_id: int):
+    # Per-device tokens are configured on the server, never shipped to the user app.
+    expected_token = os.getenv(f"CAR_CONTROL_TOKEN_{car_id}")
+    token = websocket.headers.get("authorization", "").removeprefix("Bearer ")
+    if not expected_token or not secrets.compare_digest(token.encode(), expected_token.encode()):
+        await websocket.close(code=1008)
+        return
+    with SessionLocal() as validation_db:
+        from app.models.car import Car as CarModel
+        car = validation_db.get(CarModel, car_id)
+        if not car or not car.is_active:
+            await websocket.close(code=1008)
+            return
     # 接入后立即发送占位JSON，供未来扩展为控制指令
     await websocket.accept()
     await register_car_control_connection(car_id, websocket)
@@ -133,8 +150,13 @@ async def car_control_channel(websocket: WebSocket, car_id: int):
     db = SessionLocal()
     try:
         await websocket.send_json(placeholder)
+        await _dispatch_service.resend_current_task(db, car_id)
+        db.rollback()
+        await _dispatch_service.dispatch_pending(db)
         while True:
             message = await websocket.receive()
+            if message["type"] == "websocket.disconnect":
+                break
             text = message.get("text")
             if not text:
                 continue
@@ -160,6 +182,15 @@ async def car_control_channel(websocket: WebSocket, car_id: int):
                 continue
 
             msg_type = data.get("type")
+            if msg_type == "location_update":
+                try:
+                    accepted = CarLocationService().record(db, car_id, LocationReport.model_validate(data))
+                    await websocket.send_json({"type": "location_update_ack", "ok": True, "accepted": accepted})
+                except (ValidationError, ServiceError) as e:
+                    db.rollback()
+                    await websocket.send_json({"type": "location_update_ack", "ok": False,
+                        "error": e.detail if isinstance(e, ServiceError) else "Invalid location payload"})
+                continue
             if msg_type == "task_completed":
                 task_id = data.get("task_id")
                 if not task_id:
@@ -174,6 +205,7 @@ async def car_control_channel(websocket: WebSocket, car_id: int):
                         extra_payload=data,
                     )
                     await websocket.send_json({"type": "task_completed_ack", "ok": True, "task_id": int(task_id)})
+                    await _dispatch_service.dispatch_pending(db)
                 except ServiceError as e:
                     await websocket.send_json(
                         {"type": "task_completed_ack", "ok": False, "error": e.detail, "status_code": e.status_code}
@@ -194,4 +226,4 @@ async def car_control_channel(websocket: WebSocket, car_id: int):
             db.close()
         except Exception:
             pass
-        await unregister_car_control_connection(car_id)
+        await unregister_car_control_connection(car_id, websocket)
