@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List
 
 from sqlalchemy.orm import Session
@@ -107,15 +107,11 @@ class CarService:
         """更新小车位置。"""
         self._ensure_admin(current_user)
         item = self._get_or_404(db, car_id)
-
-        item.current_latitude = payload.current_latitude
-        item.current_longitude = payload.current_longitude
-        if payload.current_speed is not None:
-            item.current_speed = payload.current_speed
-
-        item.updated_at = datetime.now()
-        db.add(item)
-        self._commit(db)
+        from app.schemas.car_location import LocationReport
+        from app.services.car_location_service import CarLocationService
+        CarLocationService().record(db, car_id, LocationReport(
+            latitude=payload.current_latitude, longitude=payload.current_longitude,
+            reported_at=datetime.now(timezone.utc), speed=payload.current_speed))
         db.refresh(item)
         return item
 

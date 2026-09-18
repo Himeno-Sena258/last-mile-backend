@@ -14,9 +14,19 @@ from app.schemas.task import (
     TaskStatusUpdate,
 )
 from app.services.task_service import TaskService
+from app.schemas.car_location import TaskLocationResponse
+from app.services.car_location_service import CarLocationService
 
 router = APIRouter()
 _task_service = TaskService()
+
+
+@router.get('/api/tasks/{task_id}/location', response_model=TaskLocationResponse)
+async def task_location(task_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    try:
+        return CarLocationService().get_for_task(db, current_user, task_id)
+    except ServiceError as e:
+        raise_http(e)
 
 
 @router.post('/api/tasks', response_model=TaskResponse, status_code=status.HTTP_201_CREATED)

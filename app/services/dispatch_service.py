@@ -19,7 +19,7 @@ from app.models.enums import (
 from app.models.express import Express
 from app.models.task import Task
 from app.models.user import User
-from app.services.car_ws_manager import send_car_control_message
+from app.services.car_ws_manager import get_car_control_connection, send_car_control_message
 from app.services.errors import ServiceError
 
 
@@ -48,6 +48,10 @@ class DispatchService:
         任务完成由小车通过 WebSocket 回传触发；因此这里不做“同步 completed”轮询。
         """
         self._ensure_admin(current_user)
+        return await self.dispatch_pending(db)
+
+    async def dispatch_pending(self, db: Session) -> Dict[str, Any]:
+        """Internal scheduler entry point; HTTP callers must pass the admin check."""
 
         started_at = datetime.utcnow()
         created_task_ids: List[int] = []
@@ -61,6 +65,9 @@ class DispatchService:
             .join(Express, Appointment.express_id == Express.id)
             .filter(Appointment.status == AppointmentStatus.scheduled)
             .filter(Express.task_id.is_(None))
+            .filter(Express.status == ExpressStatus.unassigned)
+            .order_by(Appointment.appointment_time.asc(), Appointment.id.asc())
+            .with_for_update()
             .all()
         )
 
@@ -91,16 +98,20 @@ class DispatchService:
         # 确保 Express.task_id 的更新对后续查询可见。
         db.flush()
 
-        # Step B：为 idle 小车分配 pending 任务（只处理一辆车/一个任务即可满足当前验收）
-        car = (
+        # Assign pending tasks in appointment order to connected idle cars.
+        cars = (
             db.query(Car)
             .filter(Car.is_active.is_(True))
             .filter(Car.task_status == CarTaskStatus.idle)
+            .filter(Car.current_task_id.is_(None))
             .order_by(Car.id.asc())
-            .first()
+            .with_for_update(skip_locked=True)
+            .all()
         )
 
-        if car:
+        for car in cars:
+            if not await get_car_control_connection(car.id):
+                continue
             task_row = (
                 db.query(Task, Express, Appointment)
                 .join(Express, Express.task_id == Task.id)
@@ -110,6 +121,7 @@ class DispatchService:
                 .filter(Express.status == ExpressStatus.unassigned)
                 .filter(Appointment.status == AppointmentStatus.scheduled)
                 .order_by(Appointment.appointment_time.asc(), Task.created_at.asc())
+                .with_for_update(skip_locked=True)
                 .first()
             )
 
@@ -153,10 +165,11 @@ class DispatchService:
                         else None,
                     }
                 )
+                db.flush()
 
         db.commit()
 
-        # 发送下发指令（若小车尚未连接，则允许本次周期跳过；下一次分配/重连后可继续补发）
+        # Persist assignments before sending; reconnect replays the current task.
         for ctx in assignment_contexts:
             payload = {
                 "type": "dispatch_task",
@@ -185,6 +198,35 @@ class DispatchService:
             "skipped": None,
         }
 
+    async def resend_current_task(self, db: Session, car_id: int) -> bool:
+        """Replay the same task ID on reconnect; cars must deduplicate commands by ID."""
+        row = (
+            db.query(Task, Express, Appointment)
+            .join(Car, Car.current_task_id == Task.id)
+            .join(Express, Express.task_id == Task.id)
+            .join(Appointment, Appointment.express_id == Express.id)
+            .filter(Car.id == car_id, Task.car_id == car_id, Task.status == TaskStatus.running)
+            .first()
+        )
+        if not row:
+            return False
+        task, express, appointment = row
+        return await send_car_control_message(car_id, {
+            "type": "dispatch_task",
+            "task_id": task.id,
+            "express_id": express.id,
+            "appointment_id": appointment.id,
+            "reserved": {},
+            "target": {
+                "address": task.target_address,
+                "latitude": float(task.target_latitude) if task.target_latitude is not None else None,
+                "longitude": float(task.target_longitude) if task.target_longitude is not None else None,
+                "coord_system": task.coord_system,
+            },
+            "expected_completion_time": task.expected_completion_time.isoformat()
+            if task.expected_completion_time else None,
+        })
+
     async def mark_task_completed_from_car(
         self,
         db: Session,
@@ -202,11 +244,13 @@ class DispatchService:
         car = self._get_or_404_car(db, car_id)
         task = self._get_task_or_404(db, task_id)
 
-        if task.status == TaskStatus.completed:
-            return
-
         if task.car_id != car.id:
             raise ServiceError(status_code=409, detail="任务与小车不匹配，无法完成同步")
+
+        if task.status == TaskStatus.completed:
+            return
+        if task.status != TaskStatus.running or car.current_task_id != task.id:
+            raise ServiceError(status_code=409, detail="任务不是小车当前执行中的任务")
 
         # 找到 Express（Task 与 Express 关系是一对一/或由 Express.task_id 反查）
         express = db.query(Express).filter(Express.task_id == task.id).first()

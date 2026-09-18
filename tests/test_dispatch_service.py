@@ -80,13 +80,13 @@ def _create_address(db: Session, text: str) -> Address:
     return addr
 
 
-def _create_express_and_appointment(db: Session, *, recipient: User, customer: User):
+def _create_express_and_appointment(db: Session, *, recipient: User, customer: User, tracking_number="TRACK-001"):
     addr = _create_address(db, "Test recipient address")
     express = Express(
         recipient_name="Tom",
         recipient_phone="13800000000",
         recipient_address_id=addr.id,
-        tracking_number="TRACK-001",
+        tracking_number=tracking_number,
         pickup_code=None,
         recipient_user_id=recipient.id,
         status=ExpressStatus.unassigned,
@@ -129,6 +129,9 @@ async def test_dispatch_cycle_creates_task_assigns_car_and_sends_message(db_sess
     service = DispatchService()
     # DispatchService 在模块 import 时已绑定 send_car_control_message，所以要 monkeypatch 到 dispatch_service 模块作用域
     monkeypatch.setattr("app.services.dispatch_service.send_car_control_message", fake_send_car_control_message)
+    async def connected(car_id):
+        return object()
+    monkeypatch.setattr("app.services.dispatch_service.get_car_control_connection", connected)
 
     result = await service.run_dispatch_cycle(db=db, current_user=admin)
 
@@ -163,6 +166,68 @@ async def test_dispatch_cycle_creates_task_assigns_car_and_sends_message(db_sess
     assert payload["type"] == "dispatch_task"
     assert payload["task_id"] == task_db.id
     assert result["assigned_task_ids"] == [task_db.id]
+
+
+@pytest.mark.asyncio
+async def test_automatic_dispatch_waits_for_connection_and_is_idempotent(db_session, monkeypatch):
+    db = db_session
+    customer = _create_recipient_user(db)
+    car = _create_car(db)
+    express, appointment = _create_express_and_appointment(db, recipient=customer, customer=customer)
+    service = DispatchService()
+    result = await service.dispatch_pending(db)
+    assert len(result["created_task_ids"]) == 1
+    assert not result["assigned_task_ids"]
+    assert car.current_task_id is None
+    assert express.status == ExpressStatus.unassigned
+    async def connected(car_id):
+        return object()
+    sent = []
+    async def send(car_id, payload):
+        sent.append(payload)
+        return True
+    monkeypatch.setattr("app.services.dispatch_service.get_car_control_connection", connected)
+    monkeypatch.setattr("app.services.dispatch_service.send_car_control_message", send)
+    await service.dispatch_pending(db)
+    await service.dispatch_pending(db)
+    assert db.query(Task).count() == 1
+    assert db.query(CarTaskAssignment).count() == 1
+    assert len(sent) == 1
+    assert await service.resend_current_task(db, car.id)
+    assert sent[0] == sent[1]
+
+
+@pytest.mark.asyncio
+async def test_dispatch_assigns_all_cars_and_continues_after_completion(db_session, monkeypatch):
+    db = db_session
+    customer = _create_recipient_user(db)
+    cars = [_create_car(db, car_number=f"CAR-{i}") for i in range(2)]
+    for i in range(3):
+        _create_express_and_appointment(db, recipient=customer, customer=customer, tracking_number=f"TRACK-{i}")
+    async def connected(car_id):
+        return object()
+    async def send(car_id, payload):
+        return True
+    monkeypatch.setattr("app.services.dispatch_service.get_car_control_connection", connected)
+    monkeypatch.setattr("app.services.dispatch_service.send_car_control_message", send)
+    service = DispatchService()
+    result = await service.dispatch_pending(db)
+    assert len(result["assigned_task_ids"]) == 2
+    old_task_id = cars[0].current_task_id
+    await service.mark_task_completed_from_car(db, car_id=cars[0].id, task_id=old_task_id)
+    next_cycle = await service.dispatch_pending(db)
+    assert len(next_cycle["assigned_task_ids"]) == 1
+    assert cars[0].current_task_id != old_task_id
+    await service.mark_task_completed_from_car(db, car_id=cars[0].id, task_id=old_task_id)
+    assert cars[0].current_task_id == next_cycle["assigned_task_ids"][0]
+
+
+@pytest.mark.asyncio
+async def test_manual_dispatch_requires_admin(db_session):
+    customer = _create_recipient_user(db_session)
+    with pytest.raises(ServiceError) as exc:
+        await DispatchService().run_dispatch_cycle(db_session, customer)
+    assert exc.value.status_code == 403
 
 
 @pytest.mark.asyncio
