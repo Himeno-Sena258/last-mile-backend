@@ -4,8 +4,8 @@ from typing import List
 
 import time
 import json
-import os
-import secrets
+import asyncio
+from app.core.device_security import require_device
 from pydantic import ValidationError
 from app.schemas.car_location import LocationReport
 from app.services.car_location_service import CarLocationService
@@ -29,6 +29,7 @@ from starlette.websockets import WebSocketDisconnect
 
 from app.services.car_ws_manager import (
     register_car_control_connection,
+    touch_car_connection,
     unregister_car_control_connection,
 )
 from app.services.dispatch_service import DispatchService
@@ -36,6 +37,30 @@ from app.services.dispatch_service import DispatchService
 router = APIRouter()
 _car_service = CarService()
 _dispatch_service = DispatchService()
+
+
+async def _device_allowed(websocket: WebSocket, car_id: int) -> bool:
+    try:
+        with SessionLocal() as db:
+            require_device(db, car_id, websocket.headers.get("authorization", ""))
+        return True
+    except ServiceError:
+        await websocket.close(code=1008)
+        return False
+
+
+async def _receive_device_message(websocket: WebSocket, car_id: int):
+    # Recheck idle connections every 30 seconds and active connections per message.
+    while True:
+        try:
+            message = await asyncio.wait_for(websocket.receive(), timeout=30)
+        except asyncio.TimeoutError:
+            if not await _device_allowed(websocket, car_id):
+                return {"type": "websocket.disconnect"}
+            continue
+        if message["type"] != "websocket.disconnect" and not await _device_allowed(websocket, car_id):
+            return {"type": "websocket.disconnect"}
+        return message
 
 
 @router.post('/api/cars', response_model=CarResponse, status_code=status.HTTP_201_CREATED)
@@ -94,12 +119,16 @@ async def update_car_status(car_id: int, payload: CarStatusUpdate, db: Session =
 
 @router.websocket('/ws/cars/{car_id}/video')
 async def car_video_stream(websocket: WebSocket, car_id: int):
+    if not await _device_allowed(websocket, car_id):
+        return
     # 接受来自小车的视频流（二进制帧）
     await websocket.accept()
     frame_count = 0
     try:
         while True:
-            message = await websocket.receive()
+            message = await _receive_device_message(websocket, car_id)
+            if message["type"] == "websocket.disconnect":
+                break
             frame = message.get('bytes')
             if frame is not None:
                 # 这里只接收帧，不做存储或转码，保持最小实现
@@ -127,18 +156,8 @@ async def car_video_stream(websocket: WebSocket, car_id: int):
 
 @router.websocket('/ws/cars/{car_id}/control')
 async def car_control_channel(websocket: WebSocket, car_id: int):
-    # Per-device tokens are configured on the server, never shipped to the user app.
-    expected_token = os.getenv(f"CAR_CONTROL_TOKEN_{car_id}")
-    token = websocket.headers.get("authorization", "").removeprefix("Bearer ")
-    if not expected_token or not secrets.compare_digest(token.encode(), expected_token.encode()):
-        await websocket.close(code=1008)
+    if not await _device_allowed(websocket, car_id):
         return
-    with SessionLocal() as validation_db:
-        from app.models.car import Car as CarModel
-        car = validation_db.get(CarModel, car_id)
-        if not car or not car.is_active:
-            await websocket.close(code=1008)
-            return
     # 接入后立即发送占位JSON，供未来扩展为控制指令
     await websocket.accept()
     await register_car_control_connection(car_id, websocket)
@@ -149,20 +168,25 @@ async def car_control_channel(websocket: WebSocket, car_id: int):
     }
     db = SessionLocal()
     try:
+        _dispatch_service.mark_car_connected(db, car_id)
         await websocket.send_json(placeholder)
         await _dispatch_service.resend_current_task(db, car_id)
         db.rollback()
         await _dispatch_service.dispatch_pending(db)
         while True:
-            message = await websocket.receive()
+            message = await _receive_device_message(websocket, car_id)
             if message["type"] == "websocket.disconnect":
                 break
+            await touch_car_connection(car_id, websocket)
+            _dispatch_service.mark_car_seen(db, car_id)
             text = message.get("text")
             if not text:
                 continue
 
             if text == "ping":
                 await websocket.send_text("pong")
+                continue
+            if text == "pong":
                 continue
 
             if text == "close":
@@ -182,8 +206,34 @@ async def car_control_channel(websocket: WebSocket, car_id: int):
                 continue
 
             msg_type = data.get("type")
+            if msg_type == "heartbeat_ack":
+                continue
+            if msg_type == "task_accepted":
+                task_id = data.get("task_id")
+                command_id = data.get("command_id")
+                if not task_id or not command_id:
+                    await websocket.send_json({"type": "task_accepted_ack", "ok": False,
+                                               "error": "missing task_id or command_id"})
+                    continue
+                try:
+                    db.expire_all()
+                    _dispatch_service.mark_task_accepted_from_car(
+                        db, car_id=car_id, task_id=int(task_id), command_id=str(command_id)
+                    )
+                    await websocket.send_json({"type": "task_accepted_ack", "ok": True,
+                                               "task_id": int(task_id), "command_id": str(command_id)})
+                except ServiceError as e:
+                    db.rollback()
+                    await websocket.send_json({"type": "task_accepted_ack", "ok": False,
+                                               "error": e.detail, "status_code": e.status_code})
+                except (ValueError, TypeError):
+                    db.rollback()
+                    await websocket.send_json({"type": "task_accepted_ack", "ok": False,
+                                               "error": "Invalid task_id"})
+                continue
             if msg_type == "location_update":
                 try:
+                    db.expire_all()
                     accepted = CarLocationService().record(db, car_id, LocationReport.model_validate(data))
                     await websocket.send_json({"type": "location_update_ack", "ok": True, "accepted": accepted})
                 except (ValidationError, ServiceError) as e:
@@ -198,6 +248,7 @@ async def car_control_channel(websocket: WebSocket, car_id: int):
                     continue
 
                 try:
+                    db.expire_all()
                     await _dispatch_service.mark_task_completed_from_car(
                         db,
                         car_id=car_id,
@@ -207,9 +258,13 @@ async def car_control_channel(websocket: WebSocket, car_id: int):
                     await websocket.send_json({"type": "task_completed_ack", "ok": True, "task_id": int(task_id)})
                     await _dispatch_service.dispatch_pending(db)
                 except ServiceError as e:
+                    db.rollback()
                     await websocket.send_json(
                         {"type": "task_completed_ack", "ok": False, "error": e.detail, "status_code": e.status_code}
                     )
+                except (ValueError, TypeError):
+                    db.rollback()
+                    await websocket.send_json({"type": "task_completed_ack", "ok": False, "error": "Invalid task_id"})
                 continue
 
             # 其他类型：当前版本仅保留“收到即可”
@@ -222,8 +277,14 @@ async def car_control_channel(websocket: WebSocket, car_id: int):
         except Exception:
             pass
     finally:
+        removed = await unregister_car_control_connection(car_id, websocket)
         try:
             db.close()
         except Exception:
             pass
-        await unregister_car_control_connection(car_id, websocket)
+        if removed:
+            try:
+                with SessionLocal() as offline_db:
+                    _dispatch_service.mark_cars_offline(offline_db, [car_id])
+            except Exception:
+                pass

@@ -17,6 +17,7 @@ from app.models.enums import UserRole
 from app.models.user import User
 from app.schemas.user import UserCreate, UserUpdate
 from app.services.errors import ServiceError
+from app.core.permissions import Permission, require_permission, require_owner
 
 
 class UserService:
@@ -54,7 +55,7 @@ class UserService:
             email=payload.email,
             name=payload.name,
             phone=payload.phone,
-            role=payload.role,
+            role=UserRole.customer,
             is_active=True,
             hashed_password=hashed_password,
             avatar_url=getattr(payload, "avatar_url", None),
@@ -70,7 +71,7 @@ class UserService:
     def login_user(self, db: Session, username: str, password: str) -> dict:
         """校验用户名密码并签发 JWT Token（返回结构保持既有格式）。"""
         user = authenticate_user(db, username, password)
-        if not user:
+        if not user or not user.is_active:
             raise ServiceError(status_code=401, detail="用户名或密码错误")
 
         access_token_expires = timedelta(minutes=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES")))
@@ -79,19 +80,17 @@ class UserService:
 
     def update_current_user(self, db: Session, current_user: User, payload: UserUpdate) -> User:
         """更新当前用户信息并返回更新后的用户实体。"""
+        require_permission(current_user, Permission.PROFILE)
         if payload.email is not None:
-            existing = get_email(db, payload.email)
+            email = payload.email.strip() or None
+            existing = get_email(db, email) if email else None
             if existing and existing.id != current_user.id:
                 raise ServiceError(status_code=400, detail="邮箱已被注册")
-            current_user.email = payload.email
+            current_user.email = email
         if payload.name is not None:
             current_user.name = payload.name
         if payload.phone is not None:
             current_user.phone = payload.phone
-        if payload.role is not None:
-            current_user.role = payload.role
-        if payload.is_active is not None:
-            current_user.is_active = payload.is_active
         if getattr(payload, "avatar_url", None) is not None:
             current_user.avatar_url = payload.avatar_url
 
@@ -106,12 +105,10 @@ class UserService:
         user_obj = db.query(User).filter(User.id == user_id).first()
         if not user_obj:
             raise ServiceError(status_code=404, detail="用户不存在")
-        if current_user.role != UserRole.admin and current_user.id != user_id:
-            raise ServiceError(status_code=403, detail="无权限访问")
+        require_owner(current_user, Permission.USER_READ, Permission.USER_ALL, user_id)
         return user_obj
 
     def list_users(self, db: Session, current_user: User) -> List[User]:
         """列出全部用户（仅管理员可访问）。"""
-        if current_user.role != UserRole.admin:
-            raise ServiceError(status_code=403, detail="无权限访问")
+        require_permission(current_user, Permission.USER_ALL)
         return db.query(User).all()

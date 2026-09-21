@@ -5,6 +5,7 @@ from .user_address import UserAddress, Address
 from .car_task_assignment import CarTaskAssignment
 from .car import Car
 from .car_location import CarLocation
+from .dispatch_command import DispatchCommand
 from .task import Task
 from .express import Express
 from .appointment import Appointment
@@ -20,6 +21,7 @@ __all__ = [
     'Address',
     'CarTaskAssignment',
     'Car',
+    'DispatchCommand',
     'Task',
     'Express',
     'Appointment',
