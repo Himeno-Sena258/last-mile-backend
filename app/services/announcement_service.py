@@ -6,10 +6,10 @@ from typing import List
 from sqlalchemy.orm import Session
 
 from app.models.announcement import Announcement
-from app.models.enums import UserRole
 from app.models.user import User
 from app.schemas.announcement import AnnouncementCreate, AnnouncementUpdate
 from app.services.errors import ServiceError
+from app.core.permissions import Permission, require_permission
 
 
 class AnnouncementService:
@@ -25,8 +25,7 @@ class AnnouncementService:
 
     def _ensure_admin(self, current_user: User) -> None:
         """仅允许管理员写入公告。"""
-        if current_user.role != UserRole.admin:
-            raise ServiceError(status_code=403, detail="无权限操作公告")
+        require_permission(current_user, Permission.ANNOUNCEMENT)
 
     def _get_or_404(self, db: Session, announcement_id: int) -> Announcement:
         """获取公告，不存在则抛出 404。"""
@@ -54,11 +53,14 @@ class AnnouncementService:
 
     def get_announcement(self, db: Session, announcement_id: int) -> Announcement:
         """按 ID 获取公告。"""
-        return self._get_or_404(db, announcement_id)
+        item = self._get_or_404(db, announcement_id)
+        if not item.is_active:
+            raise ServiceError(status_code=404, detail="公告不存在")
+        return item
 
     def list_announcements(self, db: Session) -> List[Announcement]:
         """获取全部公告（按最新在前）。"""
-        return db.query(Announcement).order_by(Announcement.id.desc()).all()
+        return db.query(Announcement).filter(Announcement.is_active.is_(True)).order_by(Announcement.id.desc()).all()
 
     def update_announcement(
         self,

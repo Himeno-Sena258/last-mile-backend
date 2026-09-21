@@ -4,7 +4,7 @@
 
 ## 接口
 
-`GET /api/tasks/{task_id}/location` 使用现有用户 Bearer Token。普通用户仅能查看自己的任务，管理员可查看全部。返回 task_id、car_number、latitude、longitude、reported_at、received_at、is_stale 和 state。状态包括 unassigned、waiting、live、stale、inactive。任务结束或车辆已执行其他任务时不返回车辆位置，避免泄露后续行程。
+`GET /api/tasks/{task_id}/location` 使用现有用户 Bearer Token。普通用户仅能查看自己的任务，管理员可查看全部。返回 task_id、car_number、latitude、longitude、reported_at、received_at、is_stale 和 state。状态包括 unassigned、waiting、live、stale、interrupted、inactive。任务结束或车辆已执行其他任务时不返回车辆位置，避免泄露后续行程。
 
 管理员可通过现有 `PATCH /api/cars/{car_id}/location` 更新定位，也会同步独立的位置时间。
 
@@ -31,4 +31,4 @@ speed 可选，沿用车辆字段单位 km/h。返回 location_update_ack，ok �
 
 地图使用现有 react-native-maps 默认 provider，接收 WGS84 坐标；GCJ-02 的任务目的地使用已有转换函数。拖动地图暂停跟随，定位按钮恢复。默认地图底图在 Android 上的实际可用性仍取决于项目的原生地图配置和设备服务支持。
 
-应用启动的 create_all 会创建新 car_locations 表；使用迁移管理的数据库需执行新增迁移 8db92c8e4110，该迁移兼容已由 create_all 创建的表。WebSocket 连接仍在进程内，继续使用单 worker。
+应用启动的 create_all 会创建新表；使用迁移管理的数据库需执行 `alembic upgrade head`。WebSocket 连接仍在进程内，继续使用单 worker。

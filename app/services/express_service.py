@@ -5,12 +5,13 @@ from typing import List, Optional
 
 from sqlalchemy.orm import Session
 
-from app.models.enums import UserRole
 from app.models.express import Express
 from app.models.user import User
 from app.models.user_address import Address
 from app.schemas.express import ExpressCreate, ExpressStatusUpdate, ExpressUpdate
 from app.services.errors import ServiceError
+from app.core.permissions import Permission, has_permission, require_permission, require_owner
+from app.models.enums import ExpressStatus
 
 
 class ExpressService:
@@ -26,8 +27,7 @@ class ExpressService:
 
     def _ensure_access(self, express_item: Express, current_user: User) -> None:
         """确保当前用户可访问指定快递。"""
-        if current_user.role != UserRole.admin and express_item.recipient_user_id != current_user.id:
-            raise ServiceError(status_code=403, detail="无权限访问该快递")
+        require_owner(current_user, Permission.EXPRESS, Permission.EXPRESS_ALL, express_item.recipient_user_id)
 
     def _get_or_404(self, db: Session, express_id: int) -> Express:
         """获取快递，不存在则抛出 404。"""
@@ -46,8 +46,11 @@ class ExpressService:
 
     def create_express(self, db: Session, current_user: User, payload: ExpressCreate) -> Express:
         """创建快递。"""
-        if current_user.role != UserRole.admin and payload.recipient_user_id != current_user.id:
-            raise ServiceError(status_code=403, detail="只能为自己创建快递")
+        require_owner(current_user, Permission.EXPRESS_CREATE, Permission.EXPRESS_ALL, payload.recipient_user_id)
+        if not has_permission(current_user, Permission.EXPRESS_ALL) and (
+            payload.task_id is not None or payload.status != ExpressStatus.unassigned
+        ):
+            raise ServiceError(status_code=403, detail="不能指定配送任务或配送状态")
 
         exists = db.query(Express).filter(Express.tracking_number == payload.tracking_number).first()
         if exists:
@@ -79,12 +82,14 @@ class ExpressService:
 
     def list_express(self, db: Session, current_user: User) -> List[Express]:
         """列出快递列表。"""
-        if current_user.role == UserRole.admin:
+        require_permission(current_user, Permission.EXPRESS)
+        if has_permission(current_user, Permission.EXPRESS_ALL):
             return db.query(Express).all()
         return db.query(Express).filter(Express.recipient_user_id == current_user.id).all()
 
     def update_express(self, db: Session, current_user: User, express_id: int, payload: ExpressUpdate) -> Express:
         """更新快递字段。"""
+        require_permission(current_user, Permission.EXPRESS_ALL)
         item = self._get_or_404(db, express_id)
         self._ensure_access(item, current_user)
 
@@ -108,6 +113,7 @@ class ExpressService:
 
     def update_express_status(self, db: Session, current_user: User, express_id: int, payload: ExpressStatusUpdate) -> Express:
         """更新快递状态。"""
+        require_permission(current_user, Permission.EXPRESS_ALL)
         item = self._get_or_404(db, express_id)
         self._ensure_access(item, current_user)
 

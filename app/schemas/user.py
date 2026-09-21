@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 from app.models.enums import UserRole
 
 class UserBase(BaseModel):
@@ -16,15 +16,17 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     """创建用户schema"""
     password: str = Field(..., min_length=6, description="密码")
+    role: Literal[UserRole.customer] = UserRole.customer
+    is_active: Literal[True] = True
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
 class UserUpdate(BaseModel):
     """更新用户schema"""
     email: Optional[str] = Field(None, max_length=100, description="邮箱")
     name: Optional[str] = Field(None, max_length=100, description="姓名")
     phone: Optional[str] = Field(None, max_length=20, description="电话")
-    role: Optional[UserRole] = Field(None, description="用户角色")
-    is_active: Optional[bool] = Field(default=True, description="是否激活")
     avatar_url: Optional[str] = Field(None, alias="avatarUrl", max_length=512, description="用户头像URL")
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
 class UserResponse(UserBase):
     """用户响应schema"""

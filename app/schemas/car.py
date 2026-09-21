@@ -43,6 +43,8 @@ class CarResponse(CarBase):
     id: int = Field(..., description="小车ID")
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
+    connected_at: Optional[datetime] = None
+    last_seen_at: Optional[datetime] = None
     
     model_config = ConfigDict(from_attributes=True)
 

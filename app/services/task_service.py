@@ -6,11 +6,11 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 
 from app.models.car import Car
-from app.models.enums import UserRole
 from app.models.task import Task
 from app.models.user import User
 from app.schemas.task import TaskCreate, TaskStatusUpdate, TaskUpdate
 from app.services.errors import ServiceError
+from app.core.permissions import Permission, has_permission, require_permission, require_owner
 
 
 class TaskService:
@@ -30,8 +30,7 @@ class TaskService:
 
     def _ensure_access(self, task: Task, current_user: User) -> None:
         """确保当前用户可访问指定任务。"""
-        if current_user.role != UserRole.admin and task.user_id != current_user.id:
-            raise ServiceError(status_code=403, detail="无权限访问该任务")
+        require_owner(current_user, Permission.TASK, Permission.TASK_ALL, task.user_id)
 
     def _get_task_or_404(self, db: Session, task_id: int) -> Task:
         """获取任务，不存在则抛出 404。"""
@@ -52,6 +51,7 @@ class TaskService:
 
     def create_task(self, db: Session, current_user: User, payload: TaskCreate) -> Task:
         """创建任务（默认归属当前用户）。"""
+        require_permission(current_user, Permission.TASK_ALL)
         car_id = self._resolve_car_id(db, payload.assigned_car_number)
         new_item = Task(
             status=payload.status,
@@ -82,12 +82,14 @@ class TaskService:
 
     def list_tasks(self, db: Session, current_user: User) -> List[Task]:
         """列出任务列表。"""
-        if current_user.role == UserRole.admin:
+        require_permission(current_user, Permission.TASK)
+        if has_permission(current_user, Permission.TASK_ALL):
             return db.query(Task).all()
         return db.query(Task).filter(Task.user_id == current_user.id).all()
 
     def update_task(self, db: Session, current_user: User, task_id: int, payload: TaskUpdate) -> Task:
         """更新任务字段。"""
+        require_permission(current_user, Permission.TASK_ALL)
         item = self._get_task_or_404(db, task_id)
         self._ensure_access(item, current_user)
 
@@ -124,6 +126,7 @@ class TaskService:
 
     def update_task_status(self, db: Session, current_user: User, task_id: int, payload: TaskStatusUpdate) -> Task:
         """仅更新任务状态（并按旧逻辑补齐完成时间）。"""
+        require_permission(current_user, Permission.TASK_ALL)
         item = self._get_task_or_404(db, task_id)
         self._ensure_access(item, current_user)
 

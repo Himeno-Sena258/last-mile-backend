@@ -28,6 +28,7 @@ class Task(BaseModel):
     user = relationship('User', back_populates='tasks')
     # 与快递的一对一关系：统一属性名为 'express'
     express = relationship('Express', back_populates='task', uselist=False)
+    dispatch_command = relationship('DispatchCommand', back_populates='task', uselist=False)
 
     @property
     def assigned_car_number(self):
@@ -36,4 +37,8 @@ class Task(BaseModel):
             return self.assigned_car.car_number if self.assigned_car else None
         except Exception:
             return None
+
+    @property
+    def dispatch_state(self):
+        return self.dispatch_command.status if self.dispatch_command else None
 

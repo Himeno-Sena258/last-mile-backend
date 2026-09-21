@@ -20,4 +20,4 @@ class TaskLocationResponse(BaseModel):
     reported_at: Optional[datetime] = None
     received_at: Optional[datetime] = None
     is_stale: bool = True
-    state: Literal["unassigned", "waiting", "live", "stale", "inactive"]
+    state: Literal["unassigned", "waiting", "live", "stale", "interrupted", "inactive"]

@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from app.models.car import Car
 from app.models.car_location import CarLocation
+from app.models.dispatch_command import DispatchCommand
 from app.models.enums import TaskStatus
 from app.schemas.car_location import LocationReport
 from app.services.errors import ServiceError
@@ -44,6 +45,9 @@ class CarLocationService:
         if task.status != TaskStatus.running or car.current_task_id != task.id:
             result["state"] = "inactive"
             return result
+        command = db.query(DispatchCommand).filter(DispatchCommand.task_id == task.id).first()
+        if command and command.status == "interrupted":
+            result["state"] = "interrupted"
         location = db.get(CarLocation, car.id)
         if not location:
             return result
@@ -51,8 +55,9 @@ class CarLocationService:
         stale = (not car.is_active or
                  now - location.reported_at > timedelta(seconds=15) or
                  now - location.received_at > timedelta(seconds=15))
+        location_state = "interrupted" if result["state"] == "interrupted" else ("stale" if stale else "live")
         result.update(latitude=location.latitude, longitude=location.longitude,
                       reported_at=location.reported_at.replace(tzinfo=timezone.utc),
                       received_at=location.received_at.replace(tzinfo=timezone.utc),
-                      is_stale=stale, state="stale" if stale else "live")
+                      is_stale=stale, state=location_state)
         return result

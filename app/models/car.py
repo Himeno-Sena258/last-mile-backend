@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Boolean, Float, ForeignKey, Integer, Enum, String
+from sqlalchemy import Column, Boolean, DateTime, Float, ForeignKey, Integer, Enum, String
 
 from sqlalchemy.orm import relationship
 from app.models.enums import CarTaskStatus
@@ -16,6 +16,8 @@ class Car(BaseModel):
     battery_level = Column(Float, default=100.0, comment='电量百分比')
     running_time = Column(Integer, default=0, comment='已经运行时间(分钟)')
     is_active = Column(Boolean, default=True, comment='是否激活')
+    connected_at = Column(DateTime, nullable=True, comment='最近连接时间')
+    last_seen_at = Column(DateTime, nullable=True, comment='最近收到车辆消息时间')
 
     current_task = relationship('Task', foreign_keys=[current_task_id])
     assigned_tasks = relationship('Task', foreign_keys='Task.car_id', back_populates='assigned_car')

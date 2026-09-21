@@ -53,6 +53,7 @@ class TaskResponse(TaskBase):
     id: int = Field(..., description="任务ID")
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
+    dispatch_state: Optional[str] = Field(None, description="派发确认状态")
     
     model_config = ConfigDict(from_attributes=True)
 

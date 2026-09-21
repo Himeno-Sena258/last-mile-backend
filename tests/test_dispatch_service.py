@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytest
 from sqlalchemy.orm import Session
@@ -17,11 +17,13 @@ from app.models.enums import (
     GeocodingStatus,
 )
 from app.models.express import Express
+from app.models.dispatch_command import DispatchCommand
 from app.models.task import Task
 from app.models.user import User
 from app.models.user_address import Address
 from app.services.dispatch_service import DispatchService
 from app.services.errors import ServiceError
+from app.services import car_ws_manager
 
 
 def _create_basic_user(db: Session) -> User:
@@ -142,30 +144,39 @@ async def test_dispatch_cycle_creates_task_assigns_car_and_sends_message(db_sess
 
     task_db = db.query(Task).filter(Task.id == task_id).first()
     assert task_db is not None
-    assert task_db.status == TaskStatus.running
+    assert task_db.status == TaskStatus.pending
     assert task_db.car_id == car.id
     assert task_db.target_address == appointment.pickup_address
     assert task_db.geocoding_status == GeocodingStatus.pending
 
     # Step B：小车与 Express 状态同步
     car_db = db.query(Car).filter(Car.id == car.id).first()
-    assert car_db.task_status == CarTaskStatus.delivering
+    assert car_db.task_status == CarTaskStatus.idle
     assert car_db.current_task_id == task_db.id
 
     express_db = db.query(Express).filter(Express.id == express.id).first()
-    assert express_db.status == ExpressStatus.delivering
+    assert express_db.status == ExpressStatus.unassigned
 
     assignment = db.query(CarTaskAssignment).filter(CarTaskAssignment.car_id == car.id).filter(CarTaskAssignment.task_id == task_db.id).first()
     assert assignment is not None
-    assert assignment.status == CarTaskStatus.delivering
+    assert assignment.status == CarTaskStatus.idle
 
     # 消息下发
     assert len(sent_payloads) == 1
     sent_car_id, payload = sent_payloads[0]
     assert sent_car_id == car.id
     assert payload["type"] == "dispatch_task"
+    assert payload["command_id"]
     assert payload["task_id"] == task_db.id
     assert result["assigned_task_ids"] == [task_db.id]
+
+    service.mark_task_accepted_from_car(
+        db, car_id=car.id, task_id=task_db.id, command_id=payload["command_id"]
+    )
+    assert task_db.status == TaskStatus.running
+    assert car_db.task_status == CarTaskStatus.delivering
+    assert express_db.status == ExpressStatus.delivering
+    assert assignment.status == CarTaskStatus.delivering
 
 
 @pytest.mark.asyncio
@@ -214,12 +225,141 @@ async def test_dispatch_assigns_all_cars_and_continues_after_completion(db_sessi
     result = await service.dispatch_pending(db)
     assert len(result["assigned_task_ids"]) == 2
     old_task_id = cars[0].current_task_id
+    command = db.query(DispatchCommand).filter(DispatchCommand.task_id == old_task_id).one()
+    service.mark_task_accepted_from_car(
+        db, car_id=cars[0].id, task_id=old_task_id, command_id=command.command_id
+    )
     await service.mark_task_completed_from_car(db, car_id=cars[0].id, task_id=old_task_id)
     next_cycle = await service.dispatch_pending(db)
     assert len(next_cycle["assigned_task_ids"]) == 1
     assert cars[0].current_task_id != old_task_id
     await service.mark_task_completed_from_car(db, car_id=cars[0].id, task_id=old_task_id)
     assert cars[0].current_task_id == next_cycle["assigned_task_ids"][0]
+
+
+@pytest.mark.asyncio
+async def test_unacknowledged_dispatch_is_released_and_can_be_reassigned(db_session, monkeypatch):
+    db = db_session
+    customer = _create_recipient_user(db)
+    car = _create_car(db)
+    express, _ = _create_express_and_appointment(db, recipient=customer, customer=customer)
+
+    async def connected(car_id):
+        return object()
+
+    async def send(car_id, payload):
+        return True
+
+    monkeypatch.setattr("app.services.dispatch_service.get_car_control_connection", connected)
+    monkeypatch.setattr("app.services.dispatch_service.send_car_control_message", send)
+    service = DispatchService()
+    await service.dispatch_pending(db)
+    task = db.get(Task, express.task_id)
+    command = db.query(DispatchCommand).filter(DispatchCommand.task_id == task.id).one()
+    first_command_id = command.command_id
+    command.created_at = datetime.utcnow() - timedelta(seconds=21)
+    db.commit()
+
+    await service.process_dispatch_commands(db)
+    assert command.status == "failed"
+    assert task.car_id is None
+    assert car.current_task_id is None
+
+    await service.dispatch_pending(db)
+    assert task.car_id == car.id
+    assert command.status == "pending"
+    assert command.command_id != first_command_id
+
+
+def test_dispatch_ack_is_idempotent_and_rejects_wrong_command(db_session):
+    db = db_session
+    customer = _create_recipient_user(db)
+    car = _create_car(db)
+    express, appointment = _create_express_and_appointment(db, recipient=customer, customer=customer)
+    task = Task(status=TaskStatus.pending, car_id=car.id, user_id=customer.id,
+                target_address=appointment.pickup_address, geocoding_status=GeocodingStatus.pending)
+    db.add(task)
+    db.flush()
+    express.task_id = task.id
+    car.current_task_id = task.id
+    command = DispatchCommand(car_id=car.id, task_id=task.id, status="pending")
+    db.add(command)
+    db.commit()
+
+    service = DispatchService()
+    service.mark_task_accepted_from_car(
+        db, car_id=car.id, task_id=task.id, command_id=command.command_id
+    )
+    acknowledged_at = command.acknowledged_at
+    service.mark_task_accepted_from_car(
+        db, car_id=car.id, task_id=task.id, command_id=command.command_id
+    )
+    assert command.acknowledged_at == acknowledged_at
+    with pytest.raises(ServiceError) as exc:
+        service.mark_task_accepted_from_car(
+            db, car_id=car.id, task_id=task.id, command_id="wrong-command"
+        )
+    assert exc.value.status_code == 409
+
+
+def test_running_task_uses_disconnect_grace_and_recovers(db_session):
+    db = db_session
+    customer = _create_recipient_user(db)
+    car = _create_car(db)
+    express, appointment = _create_express_and_appointment(db, recipient=customer, customer=customer)
+    task = Task(status=TaskStatus.running, car_id=car.id, user_id=customer.id,
+                target_address=appointment.pickup_address, geocoding_status=GeocodingStatus.pending)
+    db.add(task)
+    db.flush()
+    express.task_id = task.id
+    express.status = ExpressStatus.delivering
+    car.current_task_id = task.id
+    car.task_status = CarTaskStatus.delivering
+    car.last_seen_at = datetime.now()
+    command = DispatchCommand(car_id=car.id, task_id=task.id, status="accepted",
+                              acknowledged_at=datetime.now())
+    db.add(command)
+    db.commit()
+
+    service = DispatchService()
+    service.mark_cars_offline(db, [car.id])
+    assert command.status == "accepted"
+    assert service.reconcile_running_interruptions(db) == 0
+
+    car.last_seen_at = datetime.now() - timedelta(seconds=31)
+    db.commit()
+    assert service.reconcile_running_interruptions(db) == 1
+    assert command.status == "interrupted"
+
+    service.mark_car_connected(db, car.id)
+    service.mark_task_accepted_from_car(
+        db, car_id=car.id, task_id=task.id, command_id=command.command_id
+    )
+    assert command.status == "accepted"
+    assert command.interrupted_at is None
+    assert car.task_status == CarTaskStatus.delivering
+
+
+@pytest.mark.asyncio
+async def test_heartbeat_expires_silent_control_connection(db_session):
+    class FakeWebSocket:
+        headers = {}
+
+        def __init__(self):
+            self.closed_with = None
+
+        async def close(self, code):
+            self.closed_with = code
+
+    websocket = FakeWebSocket()
+    await car_ws_manager.register_car_control_connection(42, websocket)
+    car_ws_manager._last_seen[42] = datetime.now() - timedelta(seconds=16)
+
+    offline = await car_ws_manager.heartbeat_connections(db_session)
+
+    assert offline == [42]
+    assert websocket.closed_with == 1011
+    assert await car_ws_manager.get_car_control_connection(42) is None
 
 
 @pytest.mark.asyncio

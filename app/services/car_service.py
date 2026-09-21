@@ -6,10 +6,10 @@ from typing import List
 from sqlalchemy.orm import Session
 
 from app.models.car import Car
-from app.models.enums import UserRole
 from app.models.user import User
 from app.schemas.car import CarCreate, CarLocationUpdate, CarStatusUpdate, CarUpdate
 from app.services.errors import ServiceError
+from app.core.permissions import Permission, require_permission
 
 
 class CarService:
@@ -25,8 +25,7 @@ class CarService:
 
     def _ensure_admin(self, current_user: User) -> None:
         """确保当前用户为管理员。"""
-        if current_user.role != UserRole.admin:
-            raise ServiceError(status_code=403, detail="仅管理员可执行该操作")
+        require_permission(current_user, Permission.CAR)
 
     def _get_or_404(self, db: Session, car_id: int) -> Car:
         """获取小车，不存在则抛出 404。"""

@@ -258,6 +258,7 @@ secrets.json
 
 alembic/versions/*.py
 !alembic/versions/__init__.py
+!alembic/versions/d19f7a6c2e40_dispatch_reliability.py
 
 # Redis dump
 dump.rdb
@@ -324,3 +325,5 @@ development.ini
 
 #visual studio
 .vs/
+
+docs/
